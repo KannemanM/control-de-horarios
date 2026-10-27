@@ -1,0 +1,214 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.45;
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-ink-200/80 bg-white shadow-card;
+  }
+
+  .card-header {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4;
+  }
+
+  .card-title {
+    @apply text-sm font-semibold tracking-tight text-ink-900;
+  }
+
+  .card-subtitle {
+    @apply mt-0.5 text-xs text-ink-500;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-ink-300 hover:bg-ink-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-ink-600 transition hover:bg-ink-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-icon {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-500 transition hover:bg-ink-100 hover:text-ink-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 shadow-sm transition placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 disabled:bg-ink-50 disabled:text-ink-400;
+  }
+
+  .label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-ink-500;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none;
+  }
+
+  .badge-green {
+    @apply bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70;
+  }
+
+  .badge-amber {
+    @apply bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/70;
+  }
+
+  .badge-rose {
+    @apply bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200/70;
+  }
+
+  .badge-slate {
+    @apply bg-ink-100 text-ink-600 ring-1 ring-inset ring-ink-200;
+  }
+
+  .badge-brand {
+    @apply bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/70;
+  }
+
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .table thead th {
+    @apply bg-ink-50/80 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500;
+  }
+
+  .table tbody td {
+    @apply border-t border-ink-100 px-4 py-3 align-middle;
+  }
+
+  .table tbody tr {
+    @apply transition-colors hover:bg-ink-50/70;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-ink-200/70;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-300;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(15 23 42 / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(15 23 42 / 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}
+
+@page {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body,
+  .card,
+  .planilla-print-table,
+  .planilla-print-table * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .panel-layout {
+    display: block !important;
+  }
+
+  .panel-main {
+    padding: 0 !important;
+  }
+
+  .panel-content {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .planilla-print-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .print-col-operator {
+    width: 16% !important;
+  }
+
+  .print-col-day {
+    width: 4.1667% !important;
+  }
+
+  .print-col-total {
+    width: 9% !important;
+  }
+
+  .planilla-print-table input::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+  }
+
+  .planilla-print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .planilla-print-static {
+    position: static !important;
+    box-shadow: none !important;
+  }
+}
