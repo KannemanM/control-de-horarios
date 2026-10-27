@@ -1,11 +1,10 @@
 # Turnos · Planilla de horarios
 
-Planilla simple para cargar horarios de entrada y salida de cada operario y
+Planilla para cargar horarios de entrada y salida de cada operario y
 calcular automáticamente las horas diarias y semanales. La semana va de lunes a
 sábado.
 
-Aplicación web independiente con **Next.js + TypeScript + PostgreSQL**. No
-depende de WordPress ni de ningún servicio externo.
+Aplicación web con **Next.js + TypeScript + PostgreSQL**.
 
 ## Producción con Docker Compose
 
