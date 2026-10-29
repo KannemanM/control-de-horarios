@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { EmptyState } from "@/components/ui";
 import { avatarColor, cn } from "@/lib/utils";
@@ -51,6 +52,10 @@ export function PlanillaBoard({
   weeks: PlanillaWeek[];
 }) {
   const [operators, setOperators] = useState(initialOperators);
+  const router = useRouter();
+  useEffect(() => {
+  setOperators(initialOperators);
+}, [initialOperators]);
   const [filter, setFilter] = useState<Filter>("todos");
   const [modal, setModal] = useState<{
     operarioId: number;
@@ -117,17 +122,10 @@ export function PlanillaBoard({
         : undefined,
     });
   }
-
-  function handleSaved(operarioId: number, fecha: string) {
-    setOperators((current) =>
-      current.map((operator) => {
-        if (operator.id !== operarioId) return operator;
-        // El cliente no tiene los nuevos datos directamente; se recargan del server vía revalidatePath en la acción.
-        // Pero para optimismo, podríamos dejar el estado igual y confiar en el revalidate.
-        return operator;
-      }),
-    );
-    setModal(null);
+ 
+  function handleSaved() {
+  setModal(null);
+  router.refresh();
   }
 
   if (operators.length === 0) {
@@ -438,7 +436,7 @@ export function PlanillaBoard({
           fecha={modal.fecha}
           datos={modal.datos}
           onClose={() => setModal(null)}
-          onSaved={() => handleSaved(modal.operarioId, modal.fecha)}
+          onSaved={handleSaved}
         />
       )}
     </div>
