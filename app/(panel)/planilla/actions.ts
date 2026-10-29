@@ -5,26 +5,28 @@ import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { dateFromKey, combineDateAndTime, dateKey, parseHM } from "@/lib/time";
 
-export type SaveShiftInput = {
+export type TurnoDiaInput = {
   operarioId: number;
   fecha: string;
-  entrada: string;
-  salida: string;
+  /** Turno mañana */
+  entradaM?: string;
+  salidaM?: string;
+  /** Turno tarde */
+  entradaT?: string;
+  salidaT?: string;
+  /** Horas extras en minutos */
+  horasExtras?: number;
 };
 
-export type SaveShiftResult = { ok: boolean; error?: string };
+export type SaveDiaResult = { ok: boolean; error?: string };
 
-const DAY_MS = 86_400_000;
-
-export async function saveShift(
-  input: SaveShiftInput,
-): Promise<SaveShiftResult> {
+export async function saveDia(
+  input: TurnoDiaInput,
+): Promise<SaveDiaResult> {
   await requireSession();
 
   const operarioId = Number(input.operarioId);
   const fecha = String(input.fecha ?? "").trim();
-  const entrada = String(input.entrada ?? "").trim();
-  const salida = String(input.salida ?? "").trim();
 
   if (!Number.isInteger(operarioId) || operarioId <= 0) {
     return { ok: false, error: "Operario inválido." };
@@ -46,59 +48,82 @@ export async function saveShift(
     return { ok: false, error: "El operario no existe." };
   }
 
-  // Dejar ambos campos vacíos borra el horario del día.
-  if (!entrada && !salida) {
-    try {
-      await prisma.turno.deleteMany({
-        where: { operarioId, fecha: fechaDate },
-      });
-      revalidatePath("/planilla");
-      revalidatePath("/operarios");
-      return { ok: true };
-    } catch (cause) {
-      console.error(cause);
-      return { ok: false, error: "No se pudo borrar el horario." };
+  // Parsear y validar cada bloque
+  const bloques: Array<{
+    tipo: "ORDINARIO" | "EXTRA";
+    secuencia?: number;
+    entrada?: string;
+    salida?: string;
+    horasExtras?: number;
+  }> = [];
+
+  const validarRango = (e: string | undefined, s: string | undefined) => {
+    if (!e && !s) return null;
+    if (!e || !s) throw new Error("Completá entrada y salida del turno.");
+    const em = parseHM(e);
+    const sm = parseHM(s);
+    if (em === null || sm === null) throw new Error("Horario inválido.");
+    if (em === sm) throw new Error("La salida no puede ser igual a la entrada.");
+    return { entrada: e, salida: s };
+  };
+
+  try {
+    const m = validarRango(input.entradaM, input.salidaM);
+    if (m) bloques.push({ tipo: "ORDINARIO", secuencia: 1, ...m });
+
+    const t = validarRango(input.entradaT, input.salidaT);
+    if (t) bloques.push({ tipo: "ORDINARIO", secuencia: 2, ...t });
+
+    const ex = Number(input.horasExtras ?? 0);
+    if (ex > 0) {
+      bloques.push({ tipo: "EXTRA", horasExtras: ex });
     }
-  }
-
-  if (!entrada || !salida) {
-    return { ok: false, error: "Completá entrada y salida." };
-  }
-
-  const entradaMinutes = parseHM(entrada);
-  const salidaMinutes = parseHM(salida);
-  if (entradaMinutes === null || salidaMinutes === null) {
-    return { ok: false, error: "Usá un horario válido, por ejemplo 09:00." };
-  }
-  if (entradaMinutes === salidaMinutes) {
-    return { ok: false, error: "La salida no puede ser igual a la entrada." };
-  }
-
-  const entradaDate = combineDateAndTime(fecha, entrada);
-  let salidaDate = combineDateAndTime(fecha, salida);
-  if (salidaMinutes < entradaMinutes) {
-    salidaDate = new Date(salidaDate.getTime() + DAY_MS);
+  } catch (cause) {
+    return { ok: false, error: cause instanceof Error ? cause.message : "Error de validación." };
   }
 
   try {
-    await prisma.turno.upsert({
-      where: { operarioId_fecha: { operarioId, fecha: fechaDate } },
-      create: {
-        operarioId,
-        fecha: fechaDate,
-        entrada: entradaDate,
-        salida: salidaDate,
-      },
-      update: {
-        entrada: entradaDate,
-        salida: salidaDate,
-      },
+    // Borrar todos los turnos de este operario en esta fecha y recrear
+    await prisma.turno.deleteMany({
+      where: { operarioId, fecha: fechaDate },
     });
+
+    for (const b of bloques) {
+      if (b.tipo === "EXTRA") {
+        await prisma.turno.create({
+          data: {
+            operarioId,
+            fecha: fechaDate,
+            tipo: "EXTRA",
+            horasExtras: b.horasExtras,
+          },
+        });
+      } else {
+        const entradaDate = combineDateAndTime(fecha, b.entrada!);
+        let salidaDate = combineDateAndTime(fecha, b.salida!);
+        const em = parseHM(b.entrada!);
+        const sm = parseHM(b.salida!);
+        if (sm !== null && em !== null && sm < em) {
+          salidaDate = new Date(salidaDate.getTime() + 86_400_000);
+        }
+        await prisma.turno.create({
+          data: {
+            operarioId,
+            fecha: fechaDate,
+            tipo: "ORDINARIO",
+            secuencia: b.secuencia,
+            entrada: entradaDate,
+            salida: salidaDate,
+          },
+        });
+      }
+    }
+
     revalidatePath("/planilla");
     revalidatePath("/operarios");
     return { ok: true };
   } catch (cause) {
     console.error(cause);
-    return { ok: false, error: "No se pudo guardar el horario." };
+    return { ok: false, error: "No se pudo guardar el día." };
   }
 }

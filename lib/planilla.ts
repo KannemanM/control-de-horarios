@@ -1,5 +1,6 @@
 import {
   formatDateKeyShort,
+  formatTime,
   isWeekendKey,
   monthDays,
   parseHM,
@@ -8,16 +9,28 @@ import {
   weekdayOfKey,
 } from "./time";
 
-export type PlanillaShift = {
-  entrada: string;
-  salida: string;
-  minutes: number;
+export type TurnoTipo = "ORDINARIO" | "EXTRA";
+
+export type PlanillaTurno = {
+  id: number;
+  tipo: TurnoTipo;
+  secuencia?: number;
+  entrada?: string; // HH:MM
+  salida?: string; // HH:MM
+  minutes: number; // duración (ORDINARIO) o minutos de extra (EXTRA)
+};
+
+export type PlanillaDayData = {
+  turnos: PlanillaTurno[];
+  totalMinutes: number;
+  ordinarioMinutes: number;
+  extraMinutes: number;
 };
 
 export type PlanillaOperator = {
   id: number;
   nombre: string;
-  shifts: Record<string, PlanillaShift>;
+  shifts: Record<string, PlanillaDayData>;
 };
 
 export type PlanillaDay = {
@@ -102,6 +115,15 @@ export function formatHours(minutes: number): string {
   return `${hours}:${String(mins).padStart(2, "0")}`;
 }
 
+/** Formato de horas decimales para extras: 2.5, 1:30, etc. */
+export function formatExtraHours(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (mins === 0) return `${hours}`;
+  return `${hours}:${String(mins).padStart(2, "0")}`;
+}
+
 export function buildPlanillaDays(monthKey: string): PlanillaDay[] {
   const today = todayKey();
   return monthDays(monthKey)
@@ -144,20 +166,88 @@ export function buildPlanillaWeeks(days: PlanillaDay[]): PlanillaWeek[] {
   return weeks;
 }
 
+/** Construye PlanillaDayData a partir de turnos de DB para un día. */
+export function buildDayData(
+  turnos: Array<{
+    id: number;
+    tipo: string;
+    secuencia?: number | null;
+    entrada: Date | null;
+    salida: Date | null;
+    horasExtras: number | null;
+  }>,
+): PlanillaDayData {
+  const items: PlanillaTurno[] = [];
+  let ordinario = 0;
+  let extra = 0;
+
+  for (const t of turnos) {
+    const tipo = t.tipo as TurnoTipo;
+    let minutes = 0;
+
+    if (tipo === "EXTRA") {
+      minutes = t.horasExtras ?? 0;
+      extra += minutes;
+    } else {
+      if (t.entrada && t.salida) {
+        const e = formatTime(t.entrada);
+        const s = formatTime(t.salida);
+        const m = minutesBetweenTimes(e, s);
+        minutes = m ?? 0;
+      }
+      ordinario += minutes;
+    }
+
+    items.push({
+      id: t.id,
+      tipo,
+      secuencia: t.secuencia ?? undefined,
+      entrada: t.entrada ? formatTime(t.entrada) : undefined,
+      salida: t.salida ? formatTime(t.salida) : undefined,
+      minutes,
+    });
+  }
+
+  return {
+    turnos: items,
+    totalMinutes: ordinario + extra,
+    ordinarioMinutes: ordinario,
+    extraMinutes: extra,
+  };
+}
+
 export function totalForWeek(
-  shifts: Record<string, PlanillaShift>,
+  shifts: Record<string, PlanillaDayData>,
   week: PlanillaWeek,
 ): number {
   return week.days.reduce(
-    (acc, day) => acc + (shifts[day.key]?.minutes ?? 0),
+    (acc, day) => acc + (shifts[day.key]?.totalMinutes ?? 0),
     0,
   );
 }
 
-export function totalForOperator(shifts: Record<string, PlanillaShift>): number {
-  return Object.values(shifts).reduce((acc, shift) => acc + shift.minutes, 0);
+export function totalForOperator(shifts: Record<string, PlanillaDayData>): number {
+  return Object.values(shifts).reduce((acc, day) => acc + day.totalMinutes, 0);
 }
 
-export function countShifts(shifts: Record<string, PlanillaShift>): number {
-  return Object.keys(shifts).length;
+export function totalOrdinarioForOperator(
+  shifts: Record<string, PlanillaDayData>,
+): number {
+  return Object.values(shifts).reduce(
+    (acc, day) => acc + day.ordinarioMinutes,
+    0,
+  );
+}
+
+export function totalExtraForOperator(
+  shifts: Record<string, PlanillaDayData>,
+): number {
+  return Object.values(shifts).reduce((acc, day) => acc + day.extraMinutes, 0);
+}
+
+export function countTurnos(shifts: Record<string, PlanillaDayData>): number {
+  return Object.values(shifts).reduce(
+    (acc, day) => acc + day.turnos.length,
+    0,
+  );
 }
