@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum TipoTurno {
+  ORDINARIO
+  EXTRA
+}
+
 model Usuario {
   id           Int      @id @default(autoincrement())
   passwordHash String
@@ -27,11 +32,14 @@ model Turno {
   operarioId Int
   operario   Operario @relation(fields: [operarioId], references: [id], onDelete: Cascade)
   fecha      DateTime
-  entrada    DateTime
-  salida     DateTime
+  tipo       TipoTurno @default(ORDINARIO)
+  secuencia  Int?      @default(1)
+  entrada    DateTime?
+  salida     DateTime?
+  horasExtras Int?     // minutos, solo para tipo EXTRA
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([operarioId, fecha])
   @@index([fecha])
+  @@index([operarioId, fecha])
 }

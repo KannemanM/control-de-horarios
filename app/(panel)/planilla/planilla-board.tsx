@@ -7,16 +7,17 @@ import { EmptyState } from "@/components/ui";
 import { avatarColor, cn } from "@/lib/utils";
 import { monthLabel } from "@/lib/time";
 import {
-  countShifts,
+  countTurnos,
+  formatExtraHours,
   formatHours,
   totalForOperator,
   totalForWeek,
   type PlanillaDay,
+  type PlanillaDayData,
   type PlanillaOperator,
-  type PlanillaShift,
   type PlanillaWeek,
 } from "@/lib/planilla";
-import { ShiftCells } from "./shift-cells";
+import { DiaModal } from "./dia-modal";
 
 type Filter = "todos" | number;
 
@@ -33,6 +34,13 @@ function dateLabel(day: PlanillaDay) {
   return `${day.key.slice(8)}/${day.key.slice(5, 7)}`;
 }
 
+function turnoLabel(turno: { entrada?: string; salida?: string }): string {
+  if (!turno.entrada && !turno.salida) return "—";
+  const e = turno.entrada ?? "--:--";
+  const s = turno.salida ?? "--:--";
+  return `${e}-${s}`;
+}
+
 export function PlanillaBoard({
   month,
   initialOperators,
@@ -44,6 +52,16 @@ export function PlanillaBoard({
 }) {
   const [operators, setOperators] = useState(initialOperators);
   const [filter, setFilter] = useState<Filter>("todos");
+  const [modal, setModal] = useState<{
+    operarioId: number;
+    operarioNombre: string;
+    fecha: string;
+    datos?: {
+      mañana?: { entrada: string; salida: string };
+      tarde?: { entrada: string; salida: string };
+      horasExtras?: number;
+    };
+  } | null>(null);
 
   const effectiveFilter: Filter =
     filter !== "todos" && !operators.some((operator) => operator.id === filter)
@@ -57,31 +75,59 @@ export function PlanillaBoard({
 
   const summary = useMemo(() => {
     let total = 0;
-    let shifts = 0;
+    let turnos = 0;
     for (const operator of visibleOperators) {
       total += totalForOperator(operator.shifts);
-      shifts += countShifts(operator.shifts);
+      turnos += countTurnos(operator.shifts);
     }
-    return { total, shifts };
+    return { total, turnos };
   }, [visibleOperators]);
 
-  function handleSaved(
+  const resumenExtras = useMemo(() => {
+    let extra = 0;
+    for (const operator of visibleOperators) {
+      for (const day of Object.values(operator.shifts)) {
+        extra += day.extraMinutes;
+      }
+    }
+    return extra;
+  }, [visibleOperators]);
+
+  function abrirModal(
     operarioId: number,
-    dayKey: string,
-    shift: PlanillaShift | null,
+    operarioNombre: string,
+    fecha: string,
   ) {
+    const operario = operators.find((o) => o.id === operarioId);
+    const dayData = operario?.shifts[fecha];
+    setModal({
+      operarioId,
+      operarioNombre,
+      fecha,
+      datos: dayData
+        ? {
+            mañana: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 1)
+              ? { entrada: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 1)!.entrada ?? "", salida: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 1)!.salida ?? "" }
+              : undefined,
+            tarde: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 2)
+              ? { entrada: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 2)!.entrada ?? "", salida: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 2)!.salida ?? "" }
+              : undefined,
+            horasExtras: dayData.extraMinutes ?? undefined,
+          }
+        : undefined,
+    });
+  }
+
+  function handleSaved(operarioId: number, fecha: string) {
     setOperators((current) =>
       current.map((operator) => {
         if (operator.id !== operarioId) return operator;
-        const nextShifts = { ...operator.shifts };
-        if (shift) {
-          nextShifts[dayKey] = shift;
-        } else {
-          delete nextShifts[dayKey];
-        }
-        return { ...operator, shifts: nextShifts };
+        // El cliente no tiene los nuevos datos directamente; se recargan del server vía revalidatePath en la acción.
+        // Pero para optimismo, podríamos dejar el estado igual y confiar en el revalidate.
+        return operator;
       }),
     );
+    setModal(null);
   }
 
   if (operators.length === 0) {
@@ -135,12 +181,22 @@ export function PlanillaBoard({
               {formatHours(summary.total)}
             </p>
           </div>
+          {resumenExtras > 0 && (
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
+                Horas extras
+              </p>
+              <p className="text-xl font-bold leading-tight tabular-nums text-brand-700">
+                {formatHours(resumenExtras)}
+              </p>
+            </div>
+          )}
           <div className="hidden text-right sm:block">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
-              Horarios
+              Turnos
             </p>
             <p className="text-xl font-bold leading-tight tabular-nums text-ink-900">
-              {summary.shifts}
+              {summary.turnos}
             </p>
           </div>
         </div>
@@ -169,7 +225,7 @@ export function PlanillaBoard({
               {formatHours(summary.total)}
             </p>
             <p className="text-[10px] font-medium text-ink-500">
-              {summary.shifts} horarios
+              {summary.turnos} turnos
             </p>
           </div>
         </div>
@@ -194,11 +250,9 @@ export function PlanillaBoard({
               <table className="planilla-print-table w-full table-fixed border-collapse text-sm">
                 <colgroup>
                   <col className="print-col-operator w-[140px]" />
-                  {WEEKDAYS.map(({ weekday }) => (
-                    <Fragment key={weekday}>
-                      <col className="print-col-day w-[49px]" />
-                      <col className="print-col-day w-[49px]" />
-                      <col className="print-col-day w-[49px]" />
+                  {WEEKDAYS.map(() => (
+                    <Fragment>
+                      <col className="print-col-day w-[70px]" />
                     </Fragment>
                   ))}
                   <col className="print-col-total w-[68px]" />
@@ -219,7 +273,6 @@ export function PlanillaBoard({
                       return (
                         <th
                           key={weekday}
-                          colSpan={3}
                           className={cn(
                             "border-l border-ink-200 px-1 py-1.5 text-center print:px-0.5 print:py-0.5",
                             day?.isToday ? "bg-brand-100" : "bg-ink-100",
@@ -251,22 +304,6 @@ export function PlanillaBoard({
                     >
                       Total semana
                     </th>
-                  </tr>
-
-                  <tr className="border-b border-ink-200 bg-ink-50">
-                    {WEEKDAYS.map(({ weekday }) => (
-                      <Fragment key={weekday}>
-                        <th className="border-l border-ink-100 px-0.5 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-ink-400 print:px-0 print:py-0.5 print:text-[7px] print:tracking-normal">
-                          Entrada
-                        </th>
-                        <th className="border-l border-ink-100 px-0.5 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-ink-400 print:px-0 print:py-0.5 print:text-[7px] print:tracking-normal">
-                          Salida
-                        </th>
-                        <th className="border-l border-ink-100 px-0.5 py-1 text-center text-[9px] font-semibold uppercase tracking-[0.06em] text-ink-400 print:px-0 print:py-0.5 print:text-[7px] print:tracking-normal">
-                          Total
-                        </th>
-                      </Fragment>
-                    ))}
                   </tr>
                 </thead>
 
@@ -311,31 +348,68 @@ export function PlanillaBoard({
                             return (
                               <td
                                 key={weekday}
-                                colSpan={3}
                                 className="border-l border-ink-100 bg-ink-50/30 px-1 py-1.5 text-center text-[11px] text-ink-300 print:px-0 print:py-0.5 print:text-[9px]"
                               >
                                 —
                               </td>
                             );
                           }
+                          const dayData = operator.shifts[day.key];
+                          const turnosOrd = dayData?.turnos.filter(
+                            (t) => t.tipo === "ORDINARIO",
+                          ) ?? [];
+                          const turnoM = turnosOrd.find((t) => t.secuencia === 1);
+                          const turnoT = turnosOrd.find((t) => t.secuencia === 2);
+                          const extra = dayData?.turnos.find(
+                            (t) => t.tipo === "EXTRA",
+                          );
+
                           return (
-                            <ShiftCells
+                            <td
                               key={day.key}
-                              operarioId={operator.id}
-                              operarioNombre={operator.nombre}
-                              day={day}
-                              shift={operator.shifts[day.key] ?? null}
-                              rowTint={rowTint}
-                              onSaved={(dayKey, shift) =>
-                                handleSaved(operator.id, dayKey, shift)
+                              className={cn(
+                                "border-l border-ink-100 px-1 py-1.5 print:px-0 print:py-0.5",
+                                day.isToday ? "bg-brand-50/60" : rowTint,
+                                "cursor-pointer hover:bg-ink-50/50",
+                              )}
+                              onClick={() =>
+                                abrirModal(operator.id, operator.nombre, day.key)
                               }
-                            />
+                            >
+                              <div className="flex flex-col gap-0.5 min-h-[44px]">
+                                {turnoM && (
+                                  <span className="text-[9px] font-medium text-ink-700 leading-none">
+                                    M {turnoLabel(turnoM)}
+                                  </span>
+                                )}
+                                {turnoT && (
+                                  <span className="text-[9px] font-medium text-ink-700 leading-none">
+                                    T {turnoLabel(turnoT)}
+                                  </span>
+                                )}
+                                {extra && (
+                                  <span className="text-[9px] font-medium text-brand-700 leading-none">
+                                    +{formatExtraHours(extra.minutes)}
+                                  </span>
+                                )}
+                                {!turnoM && !turnoT && !extra && (
+                                  <span className="text-[9px] text-ink-300 leading-none">
+                                    —
+                                  </span>
+                                )}
+                                <span className="mt-0.5 text-[10px] font-bold tabular-nums text-ink-900">
+                                  {dayData ? formatHours(dayData.totalMinutes) : "—"}
+                                </span>
+                              </div>
+                            </td>
                           );
                         })}
 
                         <td className="planilla-print-static border-l border-ink-200 bg-brand-600 px-1 py-1.5 text-center sm:sticky sm:right-0 sm:z-10 sm:shadow-[-2px_0_4px_rgba(15,23,42,0.08)] print:px-0.5 print:py-0.5">
                           <span className="text-[11px] font-bold tabular-nums text-white print:text-[9px]">
-                            {formatHours(totalForWeek(operator.shifts, week))}
+                            {formatHours(
+                              totalForWeek(operator.shifts, week),
+                            )}
                           </span>
                         </td>
                       </tr>
@@ -350,11 +424,23 @@ export function PlanillaBoard({
 
       <div className="border-t border-ink-100 bg-ink-50/50 px-5 py-3 print:hidden">
         <p className="text-[11px] text-ink-500">
-          La semana va de lunes a sábado. Los cambios se guardan automáticamente
-          al salir del campo. Usá el formato 09:00. Dejá entrada y salida vacías
-          para borrar el día.
+          La semana va de lunes a sábado. Hacé clic en cualquier día para cargar
+          turno mañana, turno tarde y horas extras. Los cambios se guardan al
+          presionar "Guardar".
         </p>
       </div>
+
+      {modal && (
+        <DiaModal
+          open
+          operarioId={modal.operarioId}
+          operarioNombre={modal.operarioNombre}
+          fecha={modal.fecha}
+          datos={modal.datos}
+          onClose={() => setModal(null)}
+          onSaved={() => handleSaved(modal.operarioId, modal.fecha)}
+        />
+      )}
     </div>
   );
 }
