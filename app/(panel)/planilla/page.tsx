@@ -34,13 +34,18 @@ export default async function PlanillaPage({
   const mes = isValidMonthKey(mesParam) ? mesParam : monthKeyOf(new Date());
   const { start, endExclusive } = monthRange(mes);
 
-  const [operarios, turnos] = await Promise.all([
+  const [operarios, turnos, observaciones] = await Promise.all([
     prisma.operario.findMany(),
     prisma.turno.findMany({
       where: {
         fecha: { gte: start, lt: endExclusive },
       },
       orderBy: [{ operarioId: "asc" }, { fecha: "asc" }, { secuencia: "asc" }],
+    }),
+    prisma.observacionDia.findMany({
+      where: {
+        fecha: { gte: start, lt: endExclusive },
+      },
     }),
   ]);
 
@@ -73,13 +78,29 @@ export default async function PlanillaPage({
     byFecha.set(key, lista);
   }
 
+  // Observaciones por operario y fecha (pueden existir sin turnos cargados)
+  const observacionesByOperario = new Map<number, Map<string, string>>();
+  for (const observacion of observaciones) {
+    const key = dateKey(observacion.fecha);
+    if (weekdayOfKey(key) === 0) continue;
+
+    let byFecha = observacionesByOperario.get(observacion.operarioId);
+    if (!byFecha) {
+      byFecha = new Map();
+      observacionesByOperario.set(observacion.operarioId, byFecha);
+    }
+    byFecha.set(key, observacion.texto);
+  }
+
   const operators: PlanillaOperator[] = operarios
     .map((operario) => {
       const byFecha = shiftsByOperario.get(operario.id) ?? new Map();
+      const obsByFecha = observacionesByOperario.get(operario.id) ?? new Map();
       const shifts: Record<string, NonNullable<ReturnType<typeof buildDayData>>> = {};
 
-      for (const [key, turnosDelDia] of byFecha.entries()) {
-        shifts[key] = buildDayData(turnosDelDia);
+      const fechas = new Set([...byFecha.keys(), ...obsByFecha.keys()]);
+      for (const key of fechas) {
+        shifts[key] = buildDayData(byFecha.get(key) ?? [], obsByFecha.get(key));
       }
 
       return {

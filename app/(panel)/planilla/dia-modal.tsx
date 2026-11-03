@@ -20,6 +20,7 @@ type DiaModalProps = {
     mañana?: { entrada: string; salida: string };
     tarde?: { entrada: string; salida: string };
     horasExtras?: number; // minutos
+    observacion?: string;
   };
   onClose: () => void;
   onSaved: () => void;
@@ -41,6 +42,7 @@ export function DiaModal({
   const [horasExtras, setHorasExtras] = useState(
     datos?.horasExtras !== undefined ? formatExtraHours(datos.horasExtras) : "",
   );
+  const [observacion, setObservacion] = useState(datos?.observacion ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,6 +103,7 @@ export function DiaModal({
         entradaT?: string;
         salidaT?: string;
         horasExtras?: number;
+        observacion?: string;
       } = { operarioId, fecha };
 
       if (m) {
@@ -114,6 +117,7 @@ export function DiaModal({
       if (ex !== null && ex !== 0) {
         input.horasExtras = ex;
       }
+      input.observacion = observacion.trim();
 
       const result: SaveDiaResult = await saveDia(input);
       if (result.ok) {
@@ -131,10 +135,11 @@ export function DiaModal({
 
   if (!open) return null;
 
+  const extraMin = exMinutos() ?? 0;
   const totalMin =
     (minutesBetweenTimes(entradaM, salidaM) ?? 0) +
     (minutesBetweenTimes(entradaT, salidaT) ?? 0) +
-    (exMinutos() ?? 0);
+    extraMin;
 
   return (
     <div
@@ -147,7 +152,7 @@ export function DiaModal({
         className="fixed inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white p-6 rounded-xl shadow-xl w-full max-w-md border border-ink-200">
+      <div className="relative bg-white p-6 rounded-xl shadow-xl w-full max-w-lg border border-ink-200">
         <div className="flex items-center justify-between mb-4">
           <h2 id="dia-modal-title" className="text-lg font-bold text-ink-900">
             {fecha}
@@ -166,7 +171,7 @@ export function DiaModal({
             {operarioNombre}
           </p>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <label className="text-[11px] font-medium text-ink-500">
                 Turno mañana
@@ -176,14 +181,14 @@ export function DiaModal({
                 placeholder="Entrada"
                 value={entradaM}
                 onChange={(e) => limpiarHora(setEntradaM, e.target.value)}
-                className="h-8 rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
+                className="h-8 w-full rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
               />
               <input
                 type="text"
                 placeholder="Salida"
                 value={salidaM}
                 onChange={(e) => limpiarHora(setSalidaM, e.target.value)}
-                className="h-8 rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
+                className="h-8 w-full rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
               />
             </div>
             <div className="space-y-2">
@@ -195,34 +200,58 @@ export function DiaModal({
                 placeholder="Entrada"
                 value={entradaT}
                 onChange={(e) => limpiarHora(setEntradaT, e.target.value)}
-                className="h-8 rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
+                className="h-8 w-full rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
               />
               <input
                 type="text"
                 placeholder="Salida"
                 value={salidaT}
                 onChange={(e) => limpiarHora(setSalidaT, e.target.value)}
-                className="h-8 rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
+                className="h-8 w-full rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[11px] font-medium text-ink-500">
+                Horas extras
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: 2:30"
+                value={horasExtras}
+                onChange={(e) => setHorasExtras(e.target.value)}
+                className="h-8 w-full rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-semibold text-rose-600 outline-none focus:border-rose-400"
+              />
+              <p className="text-center text-[9px] leading-none text-ink-400">
+                en horas o hh:mm
+              </p>
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="text-[11px] font-medium text-ink-500">
-              Horas extras
+              Observaciones
             </label>
-            <input
-              type="text"
-              placeholder="Ej: 2:30 o 2.5"
-              value={horasExtras}
-              onChange={(e) => setHorasExtras(e.target.value)}
-              className="h-8 rounded border border-ink-200 bg-transparent px-2 text-center text-[12px] font-medium outline-none focus:border-brand-500"
+            <textarea
+              rows={2}
+              maxLength={500}
+              placeholder="Ej.: faltó, licencia, cambio de turno…"
+              value={observacion}
+              onChange={(e) => setObservacion(e.target.value)}
+              className="w-full resize-none rounded border border-ink-200 bg-transparent px-2 py-1.5 text-[12px] font-medium outline-none focus:border-brand-500"
             />
           </div>
 
           {totalMin > 0 && (
             <p className="text-[11px] font-semibold text-ink-800">
-              Total del día: <span className="font-bold text-brand-700">{formatHours(totalMin)}</span>
+              Total del día:{" "}
+              <span className="font-bold text-brand-700">
+                {formatHours(totalMin)}
+              </span>
+              {extraMin > 0 && (
+                <span className="ml-1 font-bold text-rose-600">
+                  (+{formatExtraHours(extraMin)} extras)
+                </span>
+              )}
             </p>
           )}
 

@@ -19,27 +19,41 @@ model Usuario {
 }
 
 model Operario {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  createdAt DateTime @default(now())
-  turnos    Turno[]
+  id            Int              @id @default(autoincrement())
+  nombre        String
+  createdAt     DateTime         @default(now())
+  turnos        Turno[]
+  observaciones ObservacionDia[]
 
   @@index([nombre])
 }
 
 model Turno {
+  id          Int       @id @default(autoincrement())
+  operarioId  Int
+  operario    Operario  @relation(fields: [operarioId], references: [id], onDelete: Cascade)
+  fecha       DateTime
+  tipo        TipoTurno @default(ORDINARIO)
+  secuencia   Int?      @default(1)
+  entrada     DateTime?
+  salida      DateTime?
+  horasExtras Int? // minutos, solo para tipo EXTRA
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([fecha])
+  @@index([operarioId, fecha])
+}
+
+model ObservacionDia {
   id         Int      @id @default(autoincrement())
   operarioId Int
   operario   Operario @relation(fields: [operarioId], references: [id], onDelete: Cascade)
   fecha      DateTime
-  tipo       TipoTurno @default(ORDINARIO)
-  secuencia  Int?      @default(1)
-  entrada    DateTime?
-  salida     DateTime?
-  horasExtras Int?     // minutos, solo para tipo EXTRA
+  texto      String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@unique([operarioId, fecha])
   @@index([fecha])
-  @@index([operarioId, fecha])
 }

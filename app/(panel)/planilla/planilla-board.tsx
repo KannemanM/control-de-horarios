@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users } from "lucide-react";
+import { MessageSquare, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui";
 import { avatarColor, cn } from "@/lib/utils";
 import { monthLabel } from "@/lib/time";
@@ -54,8 +54,8 @@ export function PlanillaBoard({
   const [operators, setOperators] = useState(initialOperators);
   const router = useRouter();
   useEffect(() => {
-  setOperators(initialOperators);
-}, [initialOperators]);
+    setOperators(initialOperators);
+  }, [initialOperators]);
   const [filter, setFilter] = useState<Filter>("todos");
   const [modal, setModal] = useState<{
     operarioId: number;
@@ -65,6 +65,7 @@ export function PlanillaBoard({
       mañana?: { entrada: string; salida: string };
       tarde?: { entrada: string; salida: string };
       horasExtras?: number;
+      observacion?: string;
     };
   } | null>(null);
 
@@ -117,15 +118,17 @@ export function PlanillaBoard({
             tarde: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 2)
               ? { entrada: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 2)!.entrada ?? "", salida: dayData.turnos.find((t) => t.tipo === "ORDINARIO" && t.secuencia === 2)!.salida ?? "" }
               : undefined,
-            horasExtras: dayData.extraMinutes ?? undefined,
+            horasExtras:
+              dayData.extraMinutes > 0 ? dayData.extraMinutes : undefined,
+            observacion: dayData.observacion,
           }
         : undefined,
     });
   }
- 
+
   function handleSaved() {
-  setModal(null);
-  router.refresh();
+    setModal(null);
+    router.refresh();
   }
 
   if (operators.length === 0) {
@@ -184,7 +187,7 @@ export function PlanillaBoard({
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
                 Horas extras
               </p>
-              <p className="text-xl font-bold leading-tight tabular-nums text-brand-700">
+              <p className="text-xl font-bold leading-tight tabular-nums text-rose-600">
                 {formatHours(resumenExtras)}
               </p>
             </div>
@@ -366,7 +369,7 @@ export function PlanillaBoard({
                             <td
                               key={day.key}
                               className={cn(
-                                "border-l border-ink-100 px-1 py-1.5 print:px-0 print:py-0.5",
+                                "relative border-l border-ink-100 px-1 py-1.5 print:px-0 print:py-0.5",
                                 day.isToday ? "bg-brand-50/60" : rowTint,
                                 "cursor-pointer hover:bg-ink-50/50",
                               )}
@@ -374,6 +377,16 @@ export function PlanillaBoard({
                                 abrirModal(operator.id, operator.nombre, day.key)
                               }
                             >
+                              {dayData?.observacion && (
+                                <span
+                                  className="absolute bottom-0.5 right-0.5 text-amber-500"
+                                  title={`Observación: ${dayData.observacion}`}
+                                  aria-label={`Observación: ${dayData.observacion}`}
+                                  role="img"
+                                >
+                                  <MessageSquare className="h-2.5 w-2.5 print:h-2 print:w-2" />
+                                </span>
+                              )}
                               <div className="flex flex-col gap-0.5 min-h-[44px]">
                                 {turnoM && (
                                   <span className="text-[9px] font-medium text-ink-700 leading-none">
@@ -386,7 +399,7 @@ export function PlanillaBoard({
                                   </span>
                                 )}
                                 {extra && (
-                                  <span className="text-[9px] font-medium text-brand-700 leading-none">
+                                  <span className="text-[9px] font-semibold text-rose-600 leading-none">
                                     +{formatExtraHours(extra.minutes)}
                                   </span>
                                 )}
@@ -396,7 +409,9 @@ export function PlanillaBoard({
                                   </span>
                                 )}
                                 <span className="mt-0.5 text-[10px] font-bold tabular-nums text-ink-900">
-                                  {dayData ? formatHours(dayData.totalMinutes) : "—"}
+                                  {dayData && dayData.turnos.length > 0
+                                    ? formatHours(dayData.totalMinutes)
+                                    : "—"}
                                 </span>
                               </div>
                             </td>
@@ -423,8 +438,8 @@ export function PlanillaBoard({
       <div className="border-t border-ink-100 bg-ink-50/50 px-5 py-3 print:hidden">
         <p className="text-[11px] text-ink-500">
           La semana va de lunes a sábado. Hacé clic en cualquier día para cargar
-          turno mañana, turno tarde y horas extras. Los cambios se guardan al
-          presionar "Guardar".
+          turno mañana, turno tarde, horas extras y observaciones. Los cambios se
+          guardan al presionar "Guardar".
         </p>
       </div>
 

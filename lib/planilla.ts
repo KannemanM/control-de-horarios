@@ -25,6 +25,7 @@ export type PlanillaDayData = {
   totalMinutes: number;
   ordinarioMinutes: number;
   extraMinutes: number;
+  observacion?: string;
 };
 
 export type PlanillaOperator = {
@@ -176,6 +177,7 @@ export function buildDayData(
     salida: Date | null;
     horasExtras: number | null;
   }>,
+  observacion?: string,
 ): PlanillaDayData {
   const items: PlanillaTurno[] = [];
   let ordinario = 0;
@@ -213,6 +215,7 @@ export function buildDayData(
     totalMinutes: ordinario + extra,
     ordinarioMinutes: ordinario,
     extraMinutes: extra,
+    observacion: observacion?.trim() || undefined,
   };
 }
 

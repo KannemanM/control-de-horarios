@@ -16,6 +16,8 @@ export type TurnoDiaInput = {
   salidaT?: string;
   /** Horas extras en minutos */
   horasExtras?: number;
+  /** Observación del día (opcional) */
+  observacion?: string;
 };
 
 export type SaveDiaResult = { ok: boolean; error?: string };
@@ -115,6 +117,19 @@ export async function saveDia(
             entrada: entradaDate,
             salida: salidaDate,
           },
+        });
+      }
+    }
+
+    // Observación del día: una sola por operario y fecha
+    if (input.observacion !== undefined) {
+      const observacion = String(input.observacion).trim().slice(0, 500);
+      await prisma.observacionDia.deleteMany({
+        where: { operarioId, fecha: fechaDate },
+      });
+      if (observacion) {
+        await prisma.observacionDia.create({
+          data: { operarioId, fecha: fechaDate, texto: observacion },
         });
       }
     }
