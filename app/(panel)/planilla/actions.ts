@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
-import { dateFromKey, combineDateAndTime, dateKey, parseHM } from "@/lib/time";
+import { dateFromKey, combineDateAndTime, dateKey, formatDateNumeric, parseHM } from "@/lib/time";
 
 export type TurnoDiaInput = {
   operarioId: number;
@@ -44,10 +44,22 @@ export async function saveDia(
 
   const operario = await prisma.operario.findUnique({
     where: { id: operarioId },
-    select: { id: true },
+    select: { id: true, fechaAlta: true, fechaBaja: true },
   });
   if (!operario) {
     return { ok: false, error: "El operario no existe." };
+  }
+  if (operario.fechaAlta && fechaDate < operario.fechaAlta) {
+    return {
+      ok: false,
+      error: `El operario no está activo en esa fecha (alta: ${formatDateNumeric(operario.fechaAlta)}).`,
+    };
+  }
+  if (operario.fechaBaja && fechaDate > operario.fechaBaja) {
+    return {
+      ok: false,
+      error: `El operario no está activo en esa fecha (baja: ${formatDateNumeric(operario.fechaBaja)}).`,
+    };
   }
 
   // Parsear y validar cada bloque

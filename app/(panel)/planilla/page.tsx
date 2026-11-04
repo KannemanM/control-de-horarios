@@ -35,7 +35,14 @@ export default async function PlanillaPage({
   const { start, endExclusive } = monthRange(mes);
 
   const [operarios, turnos, observaciones] = await Promise.all([
-    prisma.operario.findMany(),
+    prisma.operario.findMany({
+      where: {
+        AND: [
+          { OR: [{ fechaAlta: null }, { fechaAlta: { lt: endExclusive } }] },
+          { OR: [{ fechaBaja: null }, { fechaBaja: { gte: start } }] },
+        ],
+      },
+    }),
     prisma.turno.findMany({
       where: {
         fecha: { gte: start, lt: endExclusive },

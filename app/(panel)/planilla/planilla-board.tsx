@@ -136,11 +136,11 @@ export function PlanillaBoard({
       <div className="card">
         <EmptyState
           icon={<Users className="h-6 w-6" />}
-          title="Todavía no hay operarios"
-          description="Agregá el primero para empezar a cargar horarios en la planilla."
+          title="No hay operarios activos este mes"
+          description="Revisá las fechas de alta y baja en Operarios, o agregá uno nuevo."
           action={
             <Link href="/operarios" className="btn-primary">
-              Agregar operario
+              Gestionar operarios
             </Link>
           }
         />

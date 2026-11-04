@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  CalendarRange,
   Check,
   Loader2,
   Pencil,
@@ -13,38 +14,66 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/modal";
 import { EmptyState } from "@/components/ui";
+import { dateFromKey, formatDateNumeric, monthKeyOf, monthLabel } from "@/lib/time";
 import { avatarColor, cn } from "@/lib/utils";
 import {
   createOperario,
   deleteOperario,
   renameOperario,
+  updateOperarioPeriodo,
 } from "./actions";
 
 type OperatorRow = {
   id: number;
   nombre: string;
   shiftCount: number;
+  observationCount: number;
+  fechaAlta: string | null;
+  fechaBaja: string | null;
 };
 
-export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
+type PeriodForm = {
+  operator: OperatorRow;
+  alta: string;
+  baja: string;
+};
+
+function formatKey(key: string | null): string | null {
+  return key ? formatDateNumeric(dateFromKey(key)) : null;
+}
+
+export function OperariosClient({
+  operators,
+  today,
+}: {
+  operators: OperatorRow[];
+  today: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState("");
+  const [alta, setAlta] = useState(today);
   const [error, setError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
 
+  const [period, setPeriod] = useState<PeriodForm | null>(null);
+  const [periodError, setPeriodError] = useState<string | null>(null);
+
   const [deleting, setDeleting] = useState<OperatorRow | null>(null);
+
+  const activeCount = operators.filter((operator) => !operator.fechaBaja).length;
+  const inactiveCount = operators.length - activeCount;
 
   function handleAdd(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
     startTransition(async () => {
-      const result = await createOperario(name);
+      const result = await createOperario(name, alta);
       if (result.ok) {
         setName("");
         router.refresh();
@@ -83,6 +112,46 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
     });
   }
 
+  function startPeriod(operator: OperatorRow) {
+    setPeriod({
+      operator,
+      alta: operator.fechaAlta ?? "",
+      baja: operator.fechaBaja ?? "",
+    });
+    setPeriodError(null);
+    setError(null);
+  }
+
+  function closePeriod() {
+    if (pending) return;
+    setPeriod(null);
+    setPeriodError(null);
+  }
+
+  function handlePeriod() {
+    if (!period) return;
+    setPeriodError(null);
+
+    if (period.alta && period.baja && period.alta > period.baja) {
+      setPeriodError("La fecha de alta no puede ser posterior a la de baja.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateOperarioPeriodo(
+        period.operator.id,
+        period.alta || null,
+        period.baja || null,
+      );
+      if (result.ok) {
+        setPeriod(null);
+        router.refresh();
+      } else {
+        setPeriodError(result.error ?? "No se pudieron guardar las fechas.");
+      }
+    });
+  }
+
   function handleDelete() {
     if (!deleting) return;
     setError(null);
@@ -105,27 +174,42 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
         <div className="mb-4">
           <p className="card-title">Agregar operario</p>
           <p className="card-subtitle">
-            Solo necesitás el nombre. Después cargás sus horarios en la planilla.
+            Solo necesitás el nombre y desde cuándo trabaja. Después cargás sus
+            horarios en la planilla.
           </p>
         </div>
 
-        <form onSubmit={handleAdd} className="flex flex-col gap-2 sm:flex-row">
-          <input
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value);
-              if (error) setError(null);
-            }}
-            maxLength={80}
-            required
-            className="input flex-1"
-            placeholder="Ej.: Juan Pérez"
-            aria-label="Nombre del operario"
-          />
+        <form
+          onSubmit={handleAdd}
+          className="grid gap-2 sm:grid-cols-[1fr_10rem_auto] sm:items-end"
+        >
+          <label className="block">
+            <span className="label">Nombre</span>
+            <input
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                if (error) setError(null);
+              }}
+              maxLength={80}
+              required
+              className="input"
+              placeholder="Ej.: Juan Pérez"
+            />
+          </label>
+          <label className="block">
+            <span className="label">Fecha de alta</span>
+            <input
+              type="date"
+              value={alta}
+              onChange={(event) => setAlta(event.target.value)}
+              className="input"
+            />
+          </label>
           <button
             type="submit"
             className="btn-primary shrink-0"
-            disabled={pending || !name.trim()}
+            disabled={pending || !name.trim() || !alta}
           >
             {pending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -148,8 +232,10 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
           <div>
             <p className="card-title">Equipo</p>
             <p className="card-subtitle">
-              {operators.length}{" "}
-              {operators.length === 1 ? "operario" : "operarios"}
+              {activeCount} {activeCount === 1 ? "activo" : "activos"}
+              {inactiveCount > 0
+                ? ` · ${inactiveCount} de baja`
+                : ""}
             </p>
           </div>
           <span className="badge badge-slate">
@@ -169,15 +255,24 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
           <ul className="divide-y divide-ink-100">
             {operators.map((operator) => {
               const editing = editingId === operator.id;
+              const canDelete =
+                operator.shiftCount === 0 && operator.observationCount === 0;
+              const altaLabel = formatKey(operator.fechaAlta);
+              const bajaLabel = formatKey(operator.fechaBaja);
+
               return (
                 <li
                   key={operator.id}
-                  className="flex flex-wrap items-center gap-3 px-5 py-3.5"
+                  className={cn(
+                    "flex flex-wrap items-center gap-3 px-5 py-3.5",
+                    operator.fechaBaja && "bg-ink-50/40",
+                  )}
                 >
                   <span
                     className={cn(
                       "grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-bold",
                       avatarColor(operator.id),
+                      operator.fechaBaja && "opacity-60",
                     )}
                   >
                     {operator.nombre.charAt(0).toUpperCase()}
@@ -230,10 +325,26 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
                       </form>
                     ) : (
                       <>
-                        <p className="truncate text-[13px] font-semibold text-ink-900">
-                          {operator.nombre}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p
+                            className={cn(
+                              "truncate text-[13px] font-semibold",
+                              operator.fechaBaja
+                                ? "text-ink-500"
+                                : "text-ink-900",
+                            )}
+                          >
+                            {operator.nombre}
+                          </p>
+                          {bajaLabel && (
+                            <span className="badge badge-rose">
+                              Baja {bajaLabel}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-ink-400">
+                          {altaLabel ? `Alta ${altaLabel}` : "Alta sin registrar"}
+                          {" · "}
                           {operator.shiftCount}{" "}
                           {operator.shiftCount === 1
                             ? "horario cargado"
@@ -256,13 +367,24 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeleting(operator)}
-                        className="btn-icon text-ink-400 hover:bg-rose-50 hover:text-rose-600"
-                        title="Eliminar operario"
-                        aria-label={`Eliminar ${operator.nombre}`}
+                        onClick={() => startPeriod(operator)}
+                        className="btn-icon"
+                        title="Editar fechas de alta y baja"
+                        aria-label={`Editar fechas de ${operator.nombre}`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <CalendarRange className="h-3.5 w-3.5" />
                       </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleting(operator)}
+                          className="btn-icon text-ink-400 hover:bg-rose-50 hover:text-rose-600"
+                          title="Eliminar operario"
+                          aria-label={`Eliminar ${operator.nombre}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </li>
@@ -273,12 +395,96 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
       </div>
 
       <Modal
+        open={Boolean(period)}
+        onClose={closePeriod}
+        title="Fechas del operario"
+        description="Definen en qué meses aparece en la planilla."
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={closePeriod}
+              disabled={pending}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handlePeriod}
+              disabled={pending}
+            >
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Guardar
+            </button>
+          </>
+        }
+      >
+        {period && (
+          <div className="space-y-4">
+            <p className="text-sm font-semibold text-ink-900">
+              {period.operator.nombre}
+            </p>
+
+            <label className="block">
+              <span className="label">Fecha de alta</span>
+              <input
+                type="date"
+                value={period.alta}
+                onChange={(event) => {
+                  setPeriod({ ...period, alta: event.target.value });
+                  if (periodError) setPeriodError(null);
+                }}
+                className="input"
+              />
+              <span className="mt-1 block text-[11px] text-ink-400">
+                Primer día trabajado. Vacío = sin fecha registrada.
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="label">Fecha de baja</span>
+              <input
+                type="date"
+                value={period.baja}
+                onChange={(event) => {
+                  setPeriod({ ...period, baja: event.target.value });
+                  if (periodError) setPeriodError(null);
+                }}
+                className="input"
+              />
+              <span className="mt-1 block text-[11px] text-ink-400">
+                Último día trabajado. Vacío = sigue activo.
+              </span>
+            </label>
+
+            {period.baja && (
+              <p className="rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-[11px] text-ink-600">
+                Último mes en la planilla:{" "}
+                <strong className="font-semibold text-ink-900">
+                  {monthLabel(monthKeyOf(dateFromKey(period.baja)))}
+                </strong>
+              </p>
+            )}
+
+            {periodError && (
+              <p className="text-[11px] font-medium text-rose-600">
+                {periodError}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
         open={Boolean(deleting)}
         onClose={() => {
           if (!pending) setDeleting(null);
         }}
         title="Eliminar operario"
-        description="Esta acción también borra sus horarios."
+        description="Solo se pueden eliminar operarios sin horarios cargados."
         size="sm"
         footer={
           <>
@@ -308,12 +514,7 @@ export function OperariosClient({ operators }: { operators: OperatorRow[] }) {
             <strong className="font-semibold text-ink-900">
               {deleting.nombre}
             </strong>
-            ? Se van a borrar también sus{" "}
-            <strong className="font-semibold text-ink-900">
-              {deleting.shiftCount}{" "}
-              {deleting.shiftCount === 1 ? "horario" : "horarios"}
-            </strong>
-            .
+            ? No tiene horarios ni observaciones cargados.
           </p>
         )}
       </Modal>

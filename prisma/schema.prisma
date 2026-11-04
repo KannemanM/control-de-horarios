@@ -21,11 +21,14 @@ model Usuario {
 model Operario {
   id            Int              @id @default(autoincrement())
   nombre        String
+  fechaAlta     DateTime? // primer día trabajado (inclusive). null = sin fecha registrada
+  fechaBaja     DateTime? // último día trabajado (inclusive). null = activo
   createdAt     DateTime         @default(now())
   turnos        Turno[]
   observaciones ObservacionDia[]
 
   @@index([nombre])
+  @@index([fechaBaja])
 }
 
 model Turno {
