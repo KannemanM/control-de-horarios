@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Users } from "lucide-react";
+import { FileSpreadsheet, MessageSquare, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui";
 import { avatarColor, cn } from "@/lib/utils";
 import { monthLabel } from "@/lib/time";
@@ -148,30 +148,50 @@ export function PlanillaBoard({
     );
   }
 
+  const exportHref = `/planilla/export?mes=${month}${
+    effectiveFilter === "todos" ? "" : `&operario=${effectiveFilter}`
+  }`;
+
   return (
     <div className="card overflow-hidden print:overflow-visible print:rounded-none print:border-0 print:shadow-none">
       <div className="card-header gap-3 print:hidden">
-        <label className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
-            Operario
-          </span>
-          <select
-            value={String(effectiveFilter)}
-            onChange={(event) => {
-              const value = event.target.value;
-              setFilter(value === "todos" ? "todos" : Number(value));
-            }}
-            className="input h-9 w-auto min-w-[190px] py-1.5 text-[13px] font-medium"
-            aria-label="Filtrar por operario"
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
+              Operario
+            </span>
+            <select
+              value={String(effectiveFilter)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFilter(value === "todos" ? "todos" : Number(value));
+              }}
+              className="input h-9 w-auto min-w-[190px] py-1.5 text-[13px] font-medium"
+              aria-label="Filtrar por operario"
+            >
+              <option value="todos">Todos los operarios</option>
+              {operators.map((operator) => (
+                <option key={operator.id} value={operator.id}>
+                  {operator.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <a
+            href={exportHref}
+            className="btn-secondary h-9 px-3 text-[13px]"
+            title={
+              effectiveFilter === "todos"
+                ? "Exportar el mes completo a Excel"
+                : "Exportar solo el operario seleccionado"
+            }
+            aria-label="Exportar a Excel"
           >
-            <option value="todos">Todos los operarios</option>
-            {operators.map((operator) => (
-              <option key={operator.id} value={operator.id}>
-                {operator.nombre}
-              </option>
-            ))}
-          </select>
-        </label>
+            <FileSpreadsheet className="h-4 w-4" />
+            Exportar
+          </a>
+        </div>
 
         <div className="flex items-center gap-5">
           <div className="text-right">

@@ -147,6 +147,8 @@ npm run dev
 5. El cambio se guarda solo al salir del campo.
 6. El **total diario**, el **total semanal por operario** y el **total del mes**
    se calculan automáticamente.
+7. Con **Exportar** bajás el mes en Excel (resumen por operario + detalle
+   diario), respetando el filtro de operario que tengas aplicado.
 
 Para borrar un día, dejá Entrada y Salida vacías. El domingo no forma parte de
 la semana y no se muestra en la planilla.
@@ -162,6 +164,10 @@ la semana y no se muestra en la planilla.
 - **Impresión:** botón para imprimir la planilla actual en A4 horizontal, con el
   mes, el operario seleccionado (o todos) y los colores de la app. Puede ocupar
   dos hojas; las semanas no se cortan entre páginas.
+- **Exportación a Excel:** el botón **Exportar** descarga el mes en un `.xlsx`
+  con dos hojas: **Resumen** (totales por operario, por semana y del mes, con
+  ordinarias y extras) y **Detalle** (una fila por día trabajado con entradas,
+  salidas, extras y observaciones). Respeta el filtro de operario.
 - **Turnos nocturnos:** si la salida es menor que la entrada, se suma un día.
 - **Un solo horario por operario y día.**
 - **Zona horaria fija:** America/Argentina/Buenos_Aires (UTC-3).
