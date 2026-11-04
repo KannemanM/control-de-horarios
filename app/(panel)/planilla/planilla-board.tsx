@@ -11,8 +11,10 @@ import {
   countTurnos,
   formatExtraHours,
   formatHours,
+  totalExtraForOperator,
   totalForOperator,
   totalForWeek,
+  totalOrdinarioForOperator,
   type PlanillaDay,
   type PlanillaDayData,
   type PlanillaOperator,
@@ -81,22 +83,16 @@ export function PlanillaBoard({
 
   const summary = useMemo(() => {
     let total = 0;
+    let ordinario = 0;
+    let extra = 0;
     let turnos = 0;
     for (const operator of visibleOperators) {
       total += totalForOperator(operator.shifts);
+      ordinario += totalOrdinarioForOperator(operator.shifts);
+      extra += totalExtraForOperator(operator.shifts);
       turnos += countTurnos(operator.shifts);
     }
-    return { total, turnos };
-  }, [visibleOperators]);
-
-  const resumenExtras = useMemo(() => {
-    let extra = 0;
-    for (const operator of visibleOperators) {
-      for (const day of Object.values(operator.shifts)) {
-        extra += day.extraMinutes;
-      }
-    }
-    return extra;
+    return { total, ordinario, extra, turnos };
   }, [visibleOperators]);
 
   function abrirModal(
@@ -194,6 +190,30 @@ export function PlanillaBoard({
         </div>
 
         <div className="flex items-center gap-5">
+          <div className="hidden text-right sm:block">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
+              Horas del mes
+            </p>
+            <p
+              className="text-xl font-bold leading-tight tabular-nums text-ink-900"
+              title="Horas ordinarias, sin extras"
+            >
+              {formatHours(summary.ordinario)}
+            </p>
+          </div>
+          <div className="hidden text-right sm:block">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
+              Horas extra
+            </p>
+            <p
+              className={cn(
+                "text-xl font-bold leading-tight tabular-nums",
+                summary.extra > 0 ? "text-rose-600" : "text-ink-400",
+              )}
+            >
+              {formatHours(summary.extra)}
+            </p>
+          </div>
           <div className="text-right">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
               Total del mes
@@ -202,16 +222,6 @@ export function PlanillaBoard({
               {formatHours(summary.total)}
             </p>
           </div>
-          {resumenExtras > 0 && (
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
-                Horas extras
-              </p>
-              <p className="text-xl font-bold leading-tight tabular-nums text-rose-600">
-                {formatHours(resumenExtras)}
-              </p>
-            </div>
-          )}
           <div className="hidden text-right sm:block">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
               Turnos
@@ -246,7 +256,9 @@ export function PlanillaBoard({
               {formatHours(summary.total)}
             </p>
             <p className="text-[10px] font-medium text-ink-500">
-              {summary.turnos} turnos
+              {formatHours(summary.ordinario)} ordinarias
+              {summary.extra > 0 && ` + ${formatHours(summary.extra)} extra`}
+              {` · ${summary.turnos} turnos`}
             </p>
           </div>
         </div>
