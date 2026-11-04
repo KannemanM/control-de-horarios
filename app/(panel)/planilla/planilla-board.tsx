@@ -233,7 +233,7 @@ export function PlanillaBoard({
       </div>
 
       <div className="overflow-x-auto print:overflow-visible">
-        <div className="min-w-[1090px] print:min-w-0">
+        <div className="min-w-[820px] xl:min-w-0 print:min-w-0">
           {weeks.map((week) => (
             <section
               key={week.key}

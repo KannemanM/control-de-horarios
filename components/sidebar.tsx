@@ -7,6 +7,7 @@ import {
   ChevronRight,
   LogOut,
   Menu,
+  PanelLeftClose,
   Table2,
   Users,
   X,
@@ -21,7 +22,13 @@ const NAV = [
   { href: "/operarios", label: "Operarios", icon: Users },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -85,10 +92,20 @@ export function Sidebar() {
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-[268px] flex-col bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 px-4 pb-4 pt-5 transition-transform duration-300 lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:translate-x-0 print:hidden",
           open ? "translate-x-0" : "-translate-x-full",
+          collapsed && "lg:hidden",
         )}
       >
         <div className="flex items-center justify-between px-1">
           <Logo />
+          <button
+            type="button"
+            onClick={onToggle}
+            className="hidden h-8 w-8 place-items-center rounded-lg text-white/50 hover:bg-white/10 hover:text-white lg:grid"
+            title="Ocultar panel lateral"
+            aria-label="Ocultar panel lateral"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
