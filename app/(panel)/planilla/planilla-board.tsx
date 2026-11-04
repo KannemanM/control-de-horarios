@@ -250,13 +250,13 @@ export function PlanillaBoard({
 
               <table className="planilla-print-table w-full table-fixed border-collapse text-sm">
                 <colgroup>
-                  <col className="print-col-operator w-[140px]" />
-                  {WEEKDAYS.map(() => (
-                    <Fragment>
-                      <col className="print-col-day w-[70px]" />
+                  <col className="print-col-operator w-[192px]" />
+                  {WEEKDAYS.map(({ weekday }) => (
+                    <Fragment key={weekday}>
+                      <col className="print-col-day" />
                     </Fragment>
                   ))}
-                  <col className="print-col-total w-[68px]" />
+                  <col className="print-col-total w-[76px]" />
                 </colgroup>
 
                 <thead>
